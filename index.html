@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>地質断面図の観察</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #eee; font-family: sans-serif; touch-action: none; overscroll-behavior: none; }
+        
+        #ui-panel {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 15, 15, 0.9); padding: 15px 25px;
+            border-radius: 12px; color: #fff; box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+            z-index: 100; width: 95%; max-width: 1200px;
+            display: flex; flex-direction: column; gap: 12px;
+            border: 1px solid #333;
+        }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .panel-header h3 { margin: 0; font-size: 18px; color: #fff; }
+        #status { font-size: 12px; color: #00ffcc; font-weight: normal; transition: 0.3s; }
+        
+        .toggles { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+        .toggles label { font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: bold; }
+        .toggles input[type="checkbox"] { cursor: pointer; accent-color: #00ffcc; }
+        
+        .controls-row { display: flex; gap: 20px; align-items: flex-end; }
+        .sliders { display: flex; gap: 20px; flex: 2.5; }
+        
+        .slider-group { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
+        .slider-group:nth-child(1) { flex: 1.2; }
+
+        .slider-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; height: 34px; }
+        .slider-label { font-size: 15px; color: #aaa; line-height: 1.3; }
+        
+        .slider-val-wrap { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .value-display { color: #00ffcc; font-weight: bold; font-size: 12px; white-space: nowrap; min-width: 80px; text-align: right; }
+        
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #aaa; margin: 0; }
+
+        .small-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; cursor: pointer; padding: 3px 6px; font-size: 12px; transition: 0.2s; white-space: nowrap; }
+        .small-btn:hover { background: #00ffcc; color: #000; border-color: #00ffcc; }
+
+        .btn-container { display: flex; gap: 10px; flex: 1; }
+        .action-btn { flex: 1; padding: 10px; background: #333; color: #fff; border: 1px solid #555; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; font-size: 13px; white-space: nowrap; }
+        .action-btn:hover { background: #555; border-color: #888; }
+        .action-btn.active { background: #00ffcc; color: #000; border-color: #00ffcc; }
+
+        #compass-container {
+            position: absolute; top: 20px; right: 20px;
+            width: 80px; height: 80px; background: rgba(255, 255, 255, 0.8);
+            border: 2px solid #ccc; border-radius: 50%; z-index: 100;
+            pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            display: flex; align-items: center; justify-content: center;
+        }
+        #compass-disc { position: relative; width: 100%; height: 100%; border-radius: 50%; }
+        .compass-label { position: absolute; font-weight: bold; font-size: 12px; color: #666; }
+        .compass-label.n { top: 4px; left: 50%; transform: translateX(-50%); color: #ff4444; font-size: 14px; }
+        .compass-label.s { bottom: 4px; left: 50%; transform: translateX(-50%); }
+        .compass-label.e { right: 6px; top: 50%; transform: translateY(-50%); }
+        .compass-label.w { left: 6px; top: 50%; transform: translateY(-50%); }
+        #compass-arrow { position: absolute; color: #444; font-size: 14px; transform: translateY(-2px); }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <div class="panel-header">
+            <h3>地質断面図の観察 <span id="status">GLB読込中...</span></h3>
+            <div class="toggles">
+                <label style="color:#00ffcc;"><input type="checkbox" id="toggle-clip"> ✂️ 切断面でカット</label>
+                <div style="width: 1px; height: 15px; background: #555; margin: 0 5px;"></div>
+                <label><input type="checkbox" id="toggle-sadeiue" checked> 砂岩泥岩互層(上)</label>
+                <label><input type="checkbox" id="toggle-gyoukaigan" checked> 凝灰岩層</label>
+                <label><input type="checkbox" id="toggle-sadeishita" checked> 砂岩泥岩互層(下)</label>
+                <label><input type="checkbox" id="toggle-toukousen" checked> 等高線</label>
+            </div>
+        </div>
+        
+        <div class="controls-row">
+            <div class="sliders">
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">切断の角度(走向)</span>
+                        <div class="slider-val-wrap">
+                            <span id="angle-val" class="value-display">NS (南北)</span>
+                            <button id="btn-ew" class="small-btn">ES(東西)にする</button>
+                        </div>
+                    </div>
+                    <input type="range" id="clip-angle" min="0" max="180" value="0">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">東西方向スライド(赤軸の位置変更)</span>
+                    </div>
+                    <input type="range" id="clip-pos-x" min="-100" max="100" value="100">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">南北方向スライド(赤軸の位置変更)</span>
+                    </div>
+                    <input type="range" id="clip-pos-z" min="-100" max="100" value="0">
+                </div>
+            </div>
+            <div class="btn-container">
+                <button id="view-section-btn" class="action-btn">👁️ 断面を正面から見る</button>
+                <button id="view-top-btn" class="action-btn">🚁 真上から見る</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="compass-container">
+        <div id="compass-disc">
+            <div class="compass-label n">N</div>
+            <div class="compass-label e">E</div>
+            <div class="compass-label s">S</div>
+            <div class="compass-label w">W</div>
+        </div>
+        <div id="compass-arrow">▲</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        const scene = new THREE.Scene();
+        
+        const createGradientBackground = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+            gradient.addColorStop(0, '#a1d9ff'); 
+            gradient.addColorStop(0.5, '#ffffff'); 
+            gradient.addColorStop(1, '#a1f29c'); 
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(canvas);
+        };
+        scene.background = createGradientBackground();
+        scene.fog = new THREE.Fog(0xeeeeee, 2000, 100000); 
+
+        const aspect = window.innerWidth / window.innerHeight;
+        const perspCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000000);
+        let orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000000);
+        let activeCamera = perspCamera; 
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.localClippingEnabled = false; 
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(activeCamera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.zoomSpeed = 3.0; 
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        scene.add(dirLight);
+
+        const clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+
+        let maxDimGlobal = 100;
+        let centerGlobal = new THREE.Vector3(0,0,0);
+        let polePos = new THREE.Vector3(0, 0, 0);
+
+        const redFrameGroup = new THREE.Group();
+        scene.add(redFrameGroup);
+        const cutGridGroup = new THREE.Group();
+        scene.add(cutGridGroup);
+
+        function createTextSprite(text) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = "#000000"; 
+            ctx.font = "bold 48px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, 128, 64);
+            const texture = new THREE.CanvasTexture(canvas);
+            return new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
+        }
+
+        const loader = new GLTFLoader();
+        const models = {}; 
+
+        const addOutlineCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <clipping_planes_fragment>',
+                `
+                #if NUM_CLIPPING_PLANES > 0
+                    vec4 plane;
+                    bool isNearClip = false;
+                    #if UNION_CLIPPING_PLANES > 0
+                        #pragma unroll_loop_start
+                        for ( int i = 0; i < UNION_CLIPPING_PLANES; i ++ ) {
+                            plane = clippingPlanes[ i ];
+                            float clipDist = dot( vClipPosition, plane.xyz ) - plane.w;
+                            if ( clipDist > 0.0 ) discard;
+                            if ( clipDist > -1.0 && clipDist <= 0.0 ) isNearClip = true; 
+                        }
+                        #pragma unroll_loop_end
+                    #endif
+                #endif
+                `
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                `
+                #include <dithering_fragment>
+                #if NUM_CLIPPING_PLANES > 0
+                    if ( isNearClip ) {
+                        gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); 
+                    }
+                #endif
+                `
+            );
+        };
+
+        const loadModel = (name, url, isSolid = true) => {
+            return new Promise((resolve, reject) => {
+                loader.load(url, (gltf) => {
+                    const model = gltf.scene;
+                    const originalMeshes = [];
+                    model.traverse((child) => { if (child.isMesh) originalMeshes.push(child); });
+
+                    originalMeshes.forEach((child) => {
+                        child.frustumCulled = false; 
+                        
+                        let originalColor = (name === 'toukousen') ? new THREE.Color(0x000000) : child.material.color.clone();
+                        
+                        if (name === 'sadeiue' || name === 'sadeishita') {
+                            originalColor.lerp(new THREE.Color(0xffffff), 0.20); 
+                        }
+
+                        child.material = new THREE.MeshPhongMaterial({
+                            color: originalColor, specular: 0x000000, shininess: 0,
+                            clippingPlanes: [clipPlane], side: THREE.FrontSide
+                        });
+                        
+                        if (isSolid) {
+                            child.material.onBeforeCompile = addOutlineCompile;
+
+                            const backColor = originalColor.clone().multiplyScalar(0.85);
+                            const backMat = new THREE.MeshBasicMaterial({
+                                color: backColor, 
+                                side: THREE.BackSide, 
+                                clippingPlanes: [clipPlane] 
+                            });
+                            backMat.onBeforeCompile = addOutlineCompile;
+
+                            const backMesh = new THREE.Mesh(child.geometry, backMat);
+                            backMesh.frustumCulled = false;
+                            child.add(backMesh);
+                        }
+                    });
+
+                    model.scale.set(10, 10, 10);
+                    scene.add(model);
+                    models[name] = model;
+                    resolve();
+                }, undefined, reject);
+            });
+        };
+
+        Promise.all([
+            loadModel('sadeiue', 'sadeiue.glb', true),
+            loadModel('gyoukaigan', 'gyoukaigan.glb', true),
+            loadModel('sadeishita', 'sadeishita.glb', true),
+            loadModel('toukousen', 'toukousen.glb', false)
+        ]).then(() => {
+            const box = new THREE.Box3();
+            box.expandByObject(models['sadeiue']);
+            box.expandByObject(models['gyoukaigan']);
+            box.expandByObject(models['sadeishita']);
+
+            centerGlobal.copy(box.getCenter(new THREE.Vector3()));
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            maxDimGlobal = maxDim;
+
+            const gridWidth = maxDim * 1.5;
+            const gridHelper = new THREE.GridHelper(gridWidth, 30, 0x777777, 0xaaaaaa);
+            gridHelper.position.set(centerGlobal.x, 0, centerGlobal.z);
+            scene.add(gridHelper);
+
+            const frameThickness = 0.6; 
+            const frameMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
+            
+            const topEdge = new THREE.Mesh(new THREE.BoxGeometry(gridWidth, frameThickness, frameThickness), frameMat);
+            topEdge.position.set(0, 40 + 150/2, 0);
+            redFrameGroup.add(topEdge);
+            const bottomEdge = new THREE.Mesh(new THREE.BoxGeometry(gridWidth, frameThickness, frameThickness), frameMat);
+            bottomEdge.position.set(0, 40 - 150/2, 0);
+            redFrameGroup.add(bottomEdge);
+            const leftEdge = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, 150, frameThickness), frameMat);
+            leftEdge.position.set(-gridWidth/2, 40, 0);
+            redFrameGroup.add(leftEdge);
+            const rightEdge = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, 150, frameThickness), frameMat);
+            rightEdge.position.set(gridWidth/2, 40, 0);
+            redFrameGroup.add(rightEdge);
+
+            const centerPoleMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.8 });
+            const centerPoleGeo = new THREE.CylinderGeometry(1.2, 1.2, 150);
+            centerPoleGeo.translate(0, 40, 0);
+            redFrameGroup.add(new THREE.Mesh(centerPoleGeo, centerPoleMat));
+
+            // ★新規追加：赤軸の先端に球（マーカー）を取り付けて真上から見やすくする
+            const poleTopSphereGeo = new THREE.SphereGeometry(5, 16, 16); // 半径5の球体
+            const poleTopSphere = new THREE.Mesh(poleTopSphereGeo, centerPoleMat);
+            poleTopSphere.position.set(0, 40 + 150 / 2, 0); // Y座標を赤軸の上端に合わせる
+            redFrameGroup.add(poleTopSphere);
+
+            const horizontalMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 }); 
+            const svgBox = new THREE.Box3().setFromObject(models['toukousen']);
+            const stepHeight = svgBox.max.y / 5;
+
+            for(let i = 10; i <= 60; i+=10) {
+                const h = ((i - 10) / 10) * stepHeight; 
+                const lineGeo = new THREE.BoxGeometry(gridWidth, 1.2, 1.2);
+                const horizontalLine = new THREE.Mesh(lineGeo, horizontalMat);
+                horizontalLine.position.set(0, h, 0);
+                cutGridGroup.add(horizontalLine);
+                
+                const label = createTextSprite(i + "m");
+                label.position.set(22, h + 3.5, 0); 
+                label.scale.set(44, 22, 1); 
+                cutGridGroup.add(label);
+            }
+
+            perspCamera.position.set(centerGlobal.x - maxDim, centerGlobal.y + maxDim * 0.9, centerGlobal.z + maxDim * 1.3);
+            perspCamera.lookAt(centerGlobal);
+            controls.target.copy(centerGlobal); 
+
+            const frustumSize = maxDim * 1.0; 
+            const aspect = window.innerWidth / window.innerHeight;
+            orthoCamera.left = frustumSize * aspect / -2;
+            orthoCamera.right = frustumSize * aspect / 2;
+            orthoCamera.top = frustumSize / 2;
+            orthoCamera.bottom = frustumSize / -2;
+            orthoCamera.updateProjectionMatrix();
+
+            dirLight.position.set(centerGlobal.x + maxDim, centerGlobal.y + maxDim, centerGlobal.z + maxDim);
+
+            models['sadeiue'].position.y = maxDim * 0.0001;      
+            models['sadeishita'].position.y = -maxDim * 0.0001;
+
+            const limit = Math.ceil(maxDim * 0.75);
+            const posXSlider = document.getElementById('clip-pos-x');
+            const posZSlider = document.getElementById('clip-pos-z');
+            
+            posXSlider.min = -limit; posXSlider.max = limit; posXSlider.value = limit; 
+            posZSlider.min = -limit; posZSlider.max = limit; posZSlider.value = 0; 
+
+            document.getElementById('status').style.display = 'none';
+
+            document.getElementById('toggle-sadeiue').addEventListener('change', e => models['sadeiue'].visible = e.target.checked);
+            document.getElementById('toggle-gyoukaigan').addEventListener('change', e => models['gyoukaigan'].visible = e.target.checked);
+            document.getElementById('toggle-sadeishita').addEventListener('change', e => models['sadeishita'].visible = e.target.checked);
+            document.getElementById('toggle-toukousen').addEventListener('change', e => models['toukousen'].visible = e.target.checked);
+
+            document.getElementById('toggle-clip').addEventListener('change', e => {
+                renderer.localClippingEnabled = e.target.checked;
+            });
+
+            document.getElementById('btn-ew').addEventListener('click', () => {
+                angleSlider.value = 90;
+                updateClipping();
+            });
+
+            updateClipping();
+
+        }).catch((err) => {
+            console.error(err);
+            document.getElementById('status').innerText = 'エラー（ファイル名を確認）';
+        });
+
+        const angleSlider = document.getElementById('clip-angle');
+        const posXSlider = document.getElementById('clip-pos-x');
+        const posZSlider = document.getElementById('clip-pos-z');
+        const angleLabel = document.getElementById('angle-val');
+
+        function updateClipping() {
+            const angle = parseFloat(angleSlider.value);
+            const posX = parseFloat(posXSlider.value);
+            const posZ = parseFloat(posZSlider.value);
+            
+            const rad = THREE.MathUtils.degToRad(angle);
+            const normal = new THREE.Vector3(-Math.cos(rad), 0, -Math.sin(rad)).normalize();
+
+            polePos.set(centerGlobal.x + posX, 0, centerGlobal.z + posZ);
+
+            const clipOffset = 0.3; 
+            const clipPos = polePos.clone().add(normal.clone().multiplyScalar(clipOffset));
+            clipPlane.setFromNormalAndCoplanarPoint(normal, clipPos);
+
+            redFrameGroup.position.copy(polePos);
+            redFrameGroup.lookAt(polePos.clone().add(normal));
+            cutGridGroup.position.copy(polePos);
+            cutGridGroup.lookAt(polePos.clone().add(normal));
+
+            let displayStr = "";
+            if (angle === 0 || angle === 180) displayStr = "NS (南北)";
+            else if (angle === 90) displayStr = "EW (東西)";
+            else if (angle < 90) displayStr = `N${angle}°E`;
+            else displayStr = `N${180 - angle}°W`;
+            angleLabel.innerText = displayStr;
+        }
+
+        angleSlider.addEventListener('input', updateClipping);
+        posXSlider.addEventListener('input', updateClipping);
+        posZSlider.addEventListener('input', updateClipping);
+
+        const sectionBtn = document.getElementById('view-section-btn');
+        const topBtn = document.getElementById('view-top-btn');
+
+        sectionBtn.addEventListener('click', () => {
+            const dist = maxDimGlobal * 1.5; 
+            const targetPos = centerGlobal.clone();
+            targetPos.y = 40;
+            const camPos = targetPos.clone().add(clipPlane.normal.clone().multiplyScalar(-dist));
+            
+            activeCamera = orthoCamera;
+            controls.object = orthoCamera;
+            
+            const frustumSize = maxDimGlobal * 0.65; 
+            const aspect = window.innerWidth / window.innerHeight;
+            orthoCamera.left = frustumSize * aspect / -2;
+            orthoCamera.right = frustumSize * aspect / 2;
+            orthoCamera.top = frustumSize / 2;
+            orthoCamera.bottom = frustumSize / -2;
+            orthoCamera.updateProjectionMatrix();
+            
+            orthoCamera.position.copy(camPos);
+            controls.target.copy(targetPos); 
+            orthoCamera.lookAt(controls.target);
+            controls.update();
+
+            sectionBtn.classList.add('active');
+            topBtn.classList.remove('active');
+        });
+
+        topBtn.addEventListener('click', () => {
+            const dist = maxDimGlobal * 1.5; 
+            
+            activeCamera = orthoCamera;
+            controls.object = orthoCamera;
+            
+            const frustumSize = maxDimGlobal * 1.0; 
+            const aspect = window.innerWidth / window.innerHeight;
+            orthoCamera.left = frustumSize * aspect / -2;
+            orthoCamera.right = frustumSize * aspect / 2;
+            orthoCamera.top = frustumSize / 2;
+            orthoCamera.bottom = frustumSize / -2;
+            orthoCamera.updateProjectionMatrix();
+            
+            orthoCamera.position.set(centerGlobal.x, centerGlobal.y + dist, centerGlobal.z);
+            controls.target.copy(centerGlobal);
+            orthoCamera.lookAt(centerGlobal);
+            controls.update();
+            
+            topBtn.classList.add('active');
+            sectionBtn.classList.remove('active');
+        });
+
+        controls.addEventListener('start', () => {
+            if (activeCamera === orthoCamera) {
+                activeCamera = perspCamera;
+                controls.object = perspCamera;
+                topBtn.classList.remove('active');
+                sectionBtn.classList.remove('active');
+                
+                const dist = (maxDimGlobal * 1.5 / 2) / Math.tan(THREE.MathUtils.degToRad(perspCamera.fov / 2));
+                const dir = new THREE.Vector3().subVectors(orthoCamera.position, controls.target).normalize();
+                
+                perspCamera.position.copy(controls.target).add(dir.multiplyScalar(dist));
+                perspCamera.lookAt(controls.target);
+                controls.update();
+            }
+        });
+
+        const camDir = new THREE.Vector3();
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, activeCamera);
+
+            activeCamera.getWorldDirection(camDir);
+            const compassAngle = Math.atan2(-camDir.x, -camDir.z); 
+            document.getElementById('compass-disc').style.transform = `rotate(${compassAngle}rad)`;
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            
+            perspCamera.aspect = aspect;
+            perspCamera.updateProjectionMatrix();
+
+            const currentFrustum = activeCamera === orthoCamera && sectionBtn.classList.contains('active') ? maxDimGlobal * 0.65 : maxDimGlobal * 1.0;
+            orthoCamera.left = currentFrustum * aspect / -2;
+            orthoCamera.right = currentFrustum * aspect / 2;
+            orthoCamera.top = currentFrustum / 2;
+            orthoCamera.bottom = currentFrustum / -2;
+            orthoCamera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
