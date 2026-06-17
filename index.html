@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>地質断面図の観察</title>
+    <title>地質図3D - 輪郭線＆レイアウト微調整版</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #eee; font-family: sans-serif; touch-action: none; overscroll-behavior: none; }
         
@@ -16,7 +16,7 @@
             border: 1px solid #333;
         }
         .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        .panel-header h3 { margin: 0; font-size: 18px; color: #fff; }
+        .panel-header h3 { margin: 0; font-size: 16px; color: #fff; }
         #status { font-size: 12px; color: #00ffcc; font-weight: normal; transition: 0.3s; }
         
         .toggles { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
@@ -30,14 +30,14 @@
         .slider-group:nth-child(1) { flex: 1.2; }
 
         .slider-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; height: 34px; }
-        .slider-label { font-size: 15px; color: #aaa; line-height: 1.3; }
+        .slider-label { font-size: 11px; color: #aaa; line-height: 1.3; }
         
         .slider-val-wrap { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
         .value-display { color: #00ffcc; font-weight: bold; font-size: 12px; white-space: nowrap; min-width: 80px; text-align: right; }
         
         input[type="range"] { width: 100%; cursor: pointer; accent-color: #aaa; margin: 0; }
 
-        .small-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; cursor: pointer; padding: 3px 6px; font-size: 12px; transition: 0.2s; white-space: nowrap; }
+        .small-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; cursor: pointer; padding: 3px 6px; font-size: 10px; transition: 0.2s; white-space: nowrap; }
         .small-btn:hover { background: #00ffcc; color: #000; border-color: #00ffcc; }
 
         .btn-container { display: flex; gap: 10px; flex: 1; }
@@ -77,9 +77,9 @@
             <div class="toggles">
                 <label style="color:#00ffcc;"><input type="checkbox" id="toggle-clip"> ✂️ 切断面でカット</label>
                 <div style="width: 1px; height: 15px; background: #555; margin: 0 5px;"></div>
-                <label><input type="checkbox" id="toggle-sadeiue" checked> 砂岩泥岩互層(上)</label>
-                <label><input type="checkbox" id="toggle-gyoukaigan" checked> 凝灰岩層</label>
-                <label><input type="checkbox" id="toggle-sadeishita" checked> 砂岩泥岩互層(下)</label>
+                <label><input type="checkbox" id="toggle-sadeiue" checked> 上部層</label>
+                <label><input type="checkbox" id="toggle-gyoukaigan" checked> 凝灰岩</label>
+                <label><input type="checkbox" id="toggle-sadeishita" checked> 下部層</label>
                 <label><input type="checkbox" id="toggle-toukousen" checked> 等高線</label>
             </div>
         </div>
@@ -88,23 +88,23 @@
             <div class="sliders">
                 <div class="slider-group">
                     <div class="slider-header">
-                        <span class="slider-label">切断の角度(走向)</span>
+                        <span class="slider-label">切断の角度（走向）</span>
                         <div class="slider-val-wrap">
-                            <span id="angle-val" class="value-display">NS (南北)</span>
-                            <button id="btn-ew" class="small-btn">ES(東西)にする</button>
+                            <span id="angle-val" class="value-display">N0°E (南北)</span>
+                            <button id="btn-ew" class="small-btn">東西に合わせる</button>
                         </div>
                     </div>
                     <input type="range" id="clip-angle" min="0" max="180" value="0">
                 </div>
                 <div class="slider-group">
                     <div class="slider-header">
-                        <span class="slider-label">東西方向スライド(赤軸の位置変更)</span>
+                        <span class="slider-label">東西方向スライド<br>(赤軸の位置変更)</span>
                     </div>
                     <input type="range" id="clip-pos-x" min="-100" max="100" value="100">
                 </div>
                 <div class="slider-group">
                     <div class="slider-header">
-                        <span class="slider-label">南北方向スライド(赤軸の位置変更)</span>
+                        <span class="slider-label">南北方向スライド<br>(赤軸の位置変更)</span>
                     </div>
                     <input type="range" id="clip-pos-z" min="-100" max="100" value="0">
                 </div>
@@ -314,10 +314,9 @@
             centerPoleGeo.translate(0, 40, 0);
             redFrameGroup.add(new THREE.Mesh(centerPoleGeo, centerPoleMat));
 
-            // ★新規追加：赤軸の先端に球（マーカー）を取り付けて真上から見やすくする
-            const poleTopSphereGeo = new THREE.SphereGeometry(5, 16, 16); // 半径5の球体
+            const poleTopSphereGeo = new THREE.SphereGeometry(5, 16, 16); 
             const poleTopSphere = new THREE.Mesh(poleTopSphereGeo, centerPoleMat);
-            poleTopSphere.position.set(0, 40 + 150 / 2, 0); // Y座標を赤軸の上端に合わせる
+            poleTopSphere.position.set(0, 40 + 150 / 2, 0); 
             redFrameGroup.add(poleTopSphere);
 
             const horizontalMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 }); 
@@ -337,7 +336,7 @@
                 cutGridGroup.add(label);
             }
 
-            perspCamera.position.set(centerGlobal.x - maxDim, centerGlobal.y + maxDim * 0.9, centerGlobal.z + maxDim * 1.3);
+            perspCamera.position.set(centerGlobal.x + maxDim * 1.3, centerGlobal.y + maxDim * 0.9, centerGlobal.z + maxDim * 1.3);
             perspCamera.lookAt(centerGlobal);
             controls.target.copy(centerGlobal); 
 
@@ -351,8 +350,8 @@
 
             dirLight.position.set(centerGlobal.x + maxDim, centerGlobal.y + maxDim, centerGlobal.z + maxDim);
 
-            models['sadeiue'].position.y = maxDim * 0.0005;      
-            models['sadeishita'].position.y = -maxDim * 0.0005;
+            models['sadeiue'].position.y = maxDim * 0.0001;      
+            models['sadeishita'].position.y = -maxDim * 0.0001;
 
             const limit = Math.ceil(maxDim * 0.75);
             const posXSlider = document.getElementById('clip-pos-x');
@@ -408,9 +407,22 @@
             cutGridGroup.position.copy(polePos);
             cutGridGroup.lookAt(polePos.clone().add(normal));
 
+            // ★修正：断面正面を観察中（active）の場合、角度変更に合わせてカメラをリアルタイム回転・追従させる
+            if (sectionBtn.classList.contains('active')) {
+                const dist = maxDimGlobal * 1.5; 
+                const targetPos = centerGlobal.clone();
+                targetPos.y = 40;
+                const camPos = targetPos.clone().add(clipPlane.normal.clone().multiplyScalar(-dist));
+                
+                orthoCamera.position.copy(camPos);
+                controls.target.copy(targetPos); 
+                orthoCamera.lookAt(controls.target);
+                controls.update();
+            }
+
             let displayStr = "";
-            if (angle === 0 || angle === 180) displayStr = "NS (南北)";
-            else if (angle === 90) displayStr = "EW (東西)";
+            if (angle === 0 || angle === 180) displayStr = "N0°E (南北)";
+            else if (angle === 90) displayStr = "E-W (東西)";
             else if (angle < 90) displayStr = `N${angle}°E`;
             else displayStr = `N${180 - angle}°W`;
             angleLabel.innerText = displayStr;
